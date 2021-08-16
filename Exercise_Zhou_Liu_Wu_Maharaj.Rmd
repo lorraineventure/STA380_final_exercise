@@ -1,0 +1,1298 @@
+---
+title: "STA 380 Final Exercise"
+author: "Lorraine Zhou, Shiyong Liu, Serena Wu, Ambikha Maharaj"
+date: "8/16/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE, echo=FALSE, message=FALSE, warning=FALSE}
+setwd("~/Desktop/MSBA/Summer 2021/STA 380 - Intro to ML/Exercise")
+set.seed(123)
+knitr::opts_chunk$set(out.height = "\\textheight",  out.width = "\\textwidth")
+```
+
+
+# 1. Visual Story Telling Part 1: Green Building
+
+### In this part, we will do some exploratory data analysis on a dataset which contains data of Green Buildings, and will get some insights from it.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+rm(list=ls())
+library(corrplot)
+library(ggplot2)
+library(Hmisc)
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Read the data 
+data = read.csv('greenbuildings.csv')
+data = data[, 2:23]
+
+# Check NA values in each column
+colSums(is.na(data))
+data <- na.omit(data)
+```
+
+### Correlation Matrix
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Create a correlation matrix for all data
+corrplot(cor(data), method='number', tl.cex = 1)
+```
+
+From the correlation matrix, we can see that stories and size, gas cost and percipitation, class a and size, class a and stories, employment growth and number of cold degree days, gas cost and amenities, as well as rent and cluster rent seem to be positively correlated. Electricity cost and number of heating degree days, class a and age are negatively correlated.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Adjust the following variables to factor
+str(data)
+data$amenities <- as.factor(data$amenities)
+data$net <- as.factor(data$net)
+data$Energystar <- as.factor(data$Energystar)
+data$LEED <- as.factor(data$LEED)
+data$green_rating <- as.factor(data$green_rating)
+data$class_b <- as.factor(data$class_b)
+data$class_a <- as.factor(data$class_a)
+data$renovated <- as.factor(data$renovated)
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Create green buildings data set and non-green building data set
+green <- subset(data, data$green_rating == 1)
+green <- green[,-c(13, 18)]
+notgreen <- subset(data, data$green_rating == 0)
+notgreen <- notgreen[,-c(13, 18)]
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Explore basic statistics of numeric data
+summary(green)
+```
+
+### Distribution of Data
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# explore distribution of numeric data for green buildings
+par(mar=c(1,1,1,1))
+hist.data.frame(green[,c(1,2,3,4,5,6,7,15,16,17,18,19,20)])
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# explore distribution of numeric data for non-green buildings
+par(mar=c(1,1,1,1))
+hist.data.frame(notgreen[,c(1,2,3,4,5,6,7,15,16,17,18,19,20)])
+```
+
+* We can see from the distribution of the age variable that green buildings seem to be younger than non-green buildings.
+
+### Multiple Linear Regression Model
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Fit multiple linear regression model
+model <- lm(data$Rent~., data=data)
+summary(model)
+```
+According to the summary output of our model, variables such as age, size, class_a, class_b and cluster_rent seem to explain the variation in rent pretty well. So, we will perform EDA on to those variables in order to draw some insights on the correlation between those variables and rent.
+
+### Data Visualization
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+ggplot(data=data) + 
+  geom_point(mapping=aes(x=age, y=Rent, colour=green_rating))+
+  labs(x="Age", y='Rent', title = 'Age VS Rent',
+       color='Green building')
+ggplot(data=data) + 
+  geom_point(mapping=aes(x=size, y=Rent, colour=green_rating))+
+  labs(x="Size", y='Rent', title = 'Size VS Rent',
+       color='Green building')
+ggplot(data=data) + 
+  geom_point(mapping=aes(x=cluster_rent, y=Rent, colour=green_rating))+
+  labs(x="cluster_rent", y='Rent', title = 'cluster_rent VS Rent',
+       color='Green building')
+```
+
+* Variable cluster rent is highly correlated with rent, in that they follow a positive linear trend.
+* There seem to be no correlation between age and rent.
+* Variable size is highly correlated with rent.
+* Variable electricity cost is highly correlated with rent.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Grouped Bar Plot
+counts <- table(data$green_rating, data$class_a)
+barplot(counts, main="Building Quality and Green_Rating",
+  xlab="class_A", col=c("darkblue","red"),
+  legend = rownames(counts), beside=TRUE, args.legend=list(title="Green Rating"))
+```
+
+* As expected, there is higher proportion of green building in building with higher quality for rental than in building with low quality. So, the building in class_A generally correlate higher rent since class_A is the highest class in this dataset.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Grouped Bar Plot
+counts <- table(data$green_rating, data$class_b)
+barplot(counts, main="Building Quality and Green_Rating",
+  xlab="class_B", col=c("darkblue","red"),
+  legend = rownames(counts), beside=TRUE, args.legend=list(title="Green Rating"))
+```
+
+* Since there are classes higher than class_B and lower than class_B, we can tell that the proportion of a building being a class B did not really have higher rating compared to building belonging to other class.
+
+### **Conclusion: **
+
+We do not completely agree with the conclusions of the on-staff stats guru. Though it is true that size of the building affects the rent price, the analysis can be further improved by taking other important variables into account. For example, class a generally correlates with higher rent, so whether the investment project is a class a building would definitely affect the estimated rent. 
+
+
+
+
+# 2. Visual Story Telling Part 2: Flights at ABIA
+
+### In this part, we will do some exploratory data analysis on a dataset which contains commercial flights data of Austin-Bergstrom Interational Airport in 2008. The objective of EDA is to find some interesting insights/patterns of the flights departed or landed in AUS in 2008.
+
+Read in the dataset:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+rm(list=ls())
+library(ggplot2)
+library(dplyr)
+library(gridExtra)
+flight = read.csv("ABIA.csv",na.strings= c('',NA))
+head(flight)
+```
+Take a look at the flight data columns summary:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+summary(flight)
+```
+
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+# Do some data cleaning and data type transforming steps:
+flight$Month = as.factor(flight$Month)
+flight$time = as.integer(flight$CRSDepTime)
+flight$time = as.factor(flight$time)
+```
+
+### (1). Incoming and Outgoing flights Volume
+
+First, Let's take a look at the incoming and outgoing flights Volume at ABIA by month:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+# create two subsets of the data: flights with destination = ABIA & flights with origin = ABIA
+AUS_origin = subset(flight,flight$Origin == 'AUS')
+AUS_destination = subset(flight,flight$Dest == 'AUS')
+
+AUS_orig_sum <- dplyr :: summarize(group_by(AUS_origin,Month),count=n())
+AUS_dest_sum <- dplyr :: summarize(group_by(AUS_destination,Month),count=n())
+
+AUS_orig_trend <- ggplot(AUS_orig_sum, 
+                         aes(x=Month, y=count, group = 1)) +
+                         geom_line() + 
+                         theme_classic() + 
+                         labs(x = "Month", 
+                              y = "Number of Flights Departed from AUS",
+                              title = "Departing Flights Volume Trend (in month)",
+                              subtitle = "Austin Bergstrom International Airport")
+
+AUS_dest_trend <- ggplot(AUS_dest_sum, 
+                         aes(x=Month, y=count, group = 1)) +
+                         geom_line() + 
+                         theme_classic() + 
+                         labs(x = "Month", 
+                              y = "Number of Flights Arrived at AUS",
+                              title = "Arriving Flights Volume Trend (in month)",
+                              subtitle = "Austin Bergstrom International Airport")
+
+AUS_orig_trend
+AUS_dest_trend
+```
+From the graphs above we can see that the volume of departing flights and arriving flights are pretty similar, and both have a peak in the middle of the year, which is around May to July. This might be caused by summer vacations people usually take. For example, if a family has kids, then they'll probably pick the time that their kids finished school in May to go on a family trip. The end of the year looks like the time that has the minimal volume, and this might be because people want to stay home and spend the holiday season with their families.
+
+
+
+### (2). Cancelled Flights Volume
+
+Next, we will take a look at the volume of flights that were cancelled, in month, day of month, and day of week:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+# flights that got canceled every month
+flights_cancelled = subset(flight,flight$Cancelled == 0)
+```
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+# Month
+month_cancel_sum <- dplyr :: summarize(group_by(flights_cancelled,Month),count=n())
+
+month_cancel_trend <- ggplot(month_cancel_sum, 
+                         aes(x=Month, y=count, group = 1)) +
+                         geom_line() + 
+                         theme_classic() + 
+                         labs(x = "Month", 
+                              y = "Number of Flights Cancelled",
+                              title = "Cancelled Flights Volume Trend (in month)",
+                              subtitle = "Austin Bergstrom International Airport")
+
+# Day of Month
+monthday_cancel_sum <- dplyr :: summarize(group_by(flights_cancelled,DayofMonth),count=n())
+
+monthday_cancel_trend <- ggplot(monthday_cancel_sum, 
+                         aes(x=DayofMonth, y=count, group = 1)) +
+                         geom_line() + 
+                         theme_classic() + 
+                         labs(x = "Day of Month", 
+                              y = "Number of Flights Cancelled",
+                              title = "Cancelled Flights Volume Trend (in day of month)",
+                              subtitle = "Austin Bergstrom International Airport")
+
+# Day of Week
+week_cancel_sum <- dplyr :: summarize(group_by(flights_cancelled,DayOfWeek),count=n())
+
+week_cancel_trend <- ggplot(week_cancel_sum, 
+                            aes(x=DayOfWeek, y=count, group = 1)) +
+                            geom_line() + 
+                            theme_classic() + 
+                            labs(x = "Day of Week", 
+                                 y = "Number of Flights Cancelled",
+                                 title = "Cancelled Flights Volume Trend (in day of week)",
+                                 subtitle = "Austin Bergstrom International Airport")
+
+
+month_cancel_trend
+monthday_cancel_trend
+week_cancel_trend
+```
+**Cancelled Flights in Month:** the time with most cancelled flights in a year is also around summer time, and the time with fewest cancelled flights is also in holiday season. This might be due to that the number of flights are the most in summer time and the fewest towards the end of year.
+
+**Cancelled Flights in Day of Month:** the number of cancelled flights does not vary very much in a month, but it decreases sharply at the end of the month. This is because only half of the months have a 31st day.
+
+**Cancelled Flights in Day of Week:** the number of cancelled flights in a week does not vary much either, but it decreases on the 6th day of the week. This is a very interesting finding.
+
+
+
+### (3). AUS Incoming Flight Volume by Origin and Month
+
+Let's also take a look at the arriving flights volume by origin and month:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+AUS_dest_orig_sum <- dplyr :: summarize(group_by(AUS_destination,Month,Origin),count =n())
+
+orig = dplyr :: summarize(group_by(AUS_destination,Origin),count=n())
+top_10_orig = head(arrange(orig, desc(count)),10)[,1]
+
+top_10_orig_merged = merge(AUS_dest_orig_sum,top_10_orig,by = 'Origin')
+flights_by_orig <- ggplot(top_10_orig_merged, 
+                          aes(x = Month, y = count, group = Origin)) +
+                          geom_line(aes(color = Origin)) + 
+                          theme_linedraw() + 
+                          labs(x = "Month", 
+                               y = "Number of Incoming Flights",
+                               title = "Incoming Flight Volume Trend (by month and by origin)",
+                               subtitle = "Austin Bergstrom International Airport")
+
+flights_by_orig
+```
+From the line graph above, the leading arriving flights at ABIA in volume come from Dallas and Houston airports. This makes sense because these cities are all in Texas, and people commute in-state increase the demand of in-state flights. The flights come from DAL are the most in the first half of the year, but droped to be fewer than the number of flights from DFW.
+
+
+### (4). AUS Outgoing Flight Volume by Destination and Month
+This is a mirror graph of the previous graph. It shows the departing flights volume by destination and month:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+AUS_orig_dest_sum <- dplyr :: summarize(group_by(AUS_origin,Month,Dest),count =n())
+
+dest = dplyr :: summarize(group_by(AUS_origin,Dest),count=n())
+top_10_dest = head(arrange(dest, desc(count)),10)[,1]
+
+top_10_dest_merged = merge(AUS_orig_dest_sum,top_10_dest,by = 'Dest')
+flights_by_dest <- ggplot(top_10_dest_merged, 
+                          aes(x = Month, y = count, group = Dest)) +
+                          geom_line(aes(color = Dest)) + 
+                          theme_linedraw() + 
+                          labs(x = "Month", 
+                               y = "Number of Outgoing Flights",
+                               title = "Outgoing Flight Volume Trend (by month and by destination)",
+                               subtitle = "Austin Bergstrom International Airport")
+
+flights_by_dest
+```
+We can see that it's almost the same as the graph we got above: in-state flights are the most among all the flights departing from ABIA, and the flights from DAL leads in the first half of the year and decreases in the second half.
+
+
+### (5). Delayed Flights: Flights that Delayed at Departure
+
+Let's also look at the delay flights, which is a big part in this dataset. This graph below shows the delayed departing flights from ABIA by month:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+AUS_origin$delayed_at_depart = as.factor(ifelse(AUS_origin$DepDelay > 0,1,0))
+AUS_delay_dep = subset(AUS_origin,AUS_origin$delayed_at_depart == 1)
+
+delay_dep <- dplyr :: summarize(group_by(AUS_delay_dep,Month),count=n())
+
+delay_dep_trend <- ggplot(delay_dep, 
+                         aes(x=Month, y=count, group = 1)) +
+                         geom_line() + 
+                         theme_minimal() + 
+                         labs(x = "Month", 
+                              y = "Number of Departing Flights Delayed",
+                              title = "Delayed Departing Flights Volume Trend (in month)",
+                              subtitle = "Austin Bergstrom International Airport")
+
+delay_dep_trend
+```
+From this graph we can see that the number of delayed departing flights at ABIA are the biggest in March and June, and decreases during July and August, and finally reaches its bottom from September to November. The reason of this might be that the number of flights in general are more in Spring and Summer than in Fall and Winter. But we can see that the number of delayed flight rise back in December.
+
+
+### (6). Delayed Flights: Flights that Delayed at Arrival
+Also take a look at the flights that got delayed at their arrival at ABIA by month:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+AUS_destination$delayed_at_arrive = as.factor(ifelse(AUS_destination$ArrDelay > 0,1,0))
+AUS_delay_arr = subset(AUS_destination,AUS_destination$delayed_at_arrive == 1)
+
+delay_arr <- dplyr :: summarize(group_by(AUS_delay_arr, Month),count=n())
+
+delay_arr_trend <- ggplot(delay_arr, 
+                         aes(x=Month, y=count, group = 1)) +
+                         geom_line() + 
+                         theme_minimal() + 
+                         labs(x = "Month", 
+                              y = "Number of Arriving Flights Delayed",
+                              title = "Delayed Arriving Flights Volume Trend (in month)",
+                              subtitle = "Austin Bergstrom International Airport")
+
+delay_arr_trend
+```
+This graph is very similar to the previou one, indicating that the arriving flights and departing flights at ABIA might be closely related in many ways.
+
+
+### (7). Delayed Departing Flights: Percentage by Days of Week
+
+We also made a comparison between delayed flights and non-delayed flights. Firstly, in Days of Week:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+#AUS_origin$delayed_at_depart = as.factor(ifelse(AUS_origin$DepDelay > 0,1,0))
+#AUS_delay_dep = subset(AUS_origin,AUS_origin$delayed_at_depart == 1)
+#delay_dep <- dplyr :: summarize(group_by(AUS_delay_dep, Month),count=n())
+
+#from_AUS$dep_delay_flag = ifelse(from_AUS$DepDelay > 0,1,0)
+#from_AUS$dep_delay_flag = as.factor(from_AUS$dep_delay_flag)
+
+delay_dep_2 <- dplyr :: summarize (group_by(AUS_origin, DayOfWeek, delayed_at_depart), count = n())
+delay_dep_total <- dplyr :: summarize (group_by(AUS_origin, DayOfWeek), count = n())
+
+delay_dep_merged = merge(delay_dep_2,delay_dep_total, by = 'DayOfWeek')
+delay_dep_merged$freq = (delay_dep_merged$count.x) /(delay_dep_merged$count.y)
+
+delay_bar <- ggplot() +
+             geom_bar(aes(y = freq, x = DayOfWeek, fill = delayed_at_depart), 
+                      data = delay_dep_merged, stat="identity") +
+             geom_text(data=delay_dep_merged, aes(x = DayOfWeek, 
+                                                  y = freq,label=paste0(sprintf("%.1f",(1-freq)*100),"%")),
+                       position = position_stack(vjust = 0.2),
+                       size=3, color = 'black') +
+             theme_classic() + 
+             theme(legend.position="right", 
+                   legend.direction="vertical",
+                   legend.title = element_blank()) + scale_y_continuous(labels = scales::percent) +
+             labs(x="Day of Week", y="Percentage of Delays/Non-Delays") +
+             ggtitle("Percentage of Delayed Departing Flights")
+delay_bar
+```
+In this graph, 0 means non-delayed flights, and 1 means delayed flights. The delayed flights are around 30-40% on each day of the week, does not vary a lot.
+
+### (8). Delayed Departing Flights: Percentage by Month
+
+Next, comparison and percentage by month:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+delay_dep_3 <- dplyr :: summarize (group_by(AUS_origin, Month, delayed_at_depart), count = n())
+delay_dep_total <- dplyr :: summarize (group_by(AUS_origin, Month), count = n())
+
+delay_dep_merged = merge(delay_dep_3,delay_dep_total, by = 'Month')
+delay_dep_merged$freq = (delay_dep_merged$count.x) /(delay_dep_merged$count.y)
+
+delay_bar <- ggplot() +
+             geom_bar(aes(y = freq, x = Month, fill = delayed_at_depart), 
+                      data = delay_dep_merged, stat="identity") +
+             geom_text(data=delay_dep_merged, aes(x = Month, 
+                                                  y = freq,label=paste0(sprintf("%.1f",(1-freq)*100),"%")),
+                       position = position_stack(vjust = 0.2),
+                       size=3,color = 'black') +
+             theme_classic() + 
+             theme(legend.position="right", 
+                   legend.direction="vertical",
+                   legend.title = element_blank()) + scale_y_continuous(labels = scales::percent) +
+             labs(x="Month", y="Percentage of Delays/Non-Delays") +
+             ggtitle("Percentage of Delayed Departing Flights")
+delay_bar
+```
+From this graph we can see that the delayed rate is also around 30-40% in each month, with a peak of 45.9% in March and December.
+
+
+### (9). Correlation Between Delayed Arriving Flights and Delayed Departing Flights
+
+Lastly, let's take a look at the relationship between delayed arriving flights and delayed departing flights at ABIA. We made a correlation bar plot to take a look at their relationship:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+delay_corr <- ggplot(aes(x=ArrDelay, y=DepDelay), data=flight) +
+              geom_point() +
+              theme_minimal() +
+              ggtitle('Correlation: Delayed Departing Flights vs. Delayed Arriving Flights') + 
+              xlab('Departure Delay') + 
+              ylab('Arrival Delay')
+
+delay_corr
+```
+From this correlation plot we can see that the departing delays and arriving delays are closely related, and the correlation is almost 1 - incredibly high! It's also easy to explain this phenomenon: most planes arrive at ABIA, stop for a bit, and depart for its next trip. Therefore, a delayed arrival will almost always cause a delayed departure, which makes good sense.
+
+
+
+
+# 3. Portfolio modeling
+
+## The objective of this analysis is to construct three different portfolios of exchange-traded funds (ETFs) and use bootstrap resampling to analyze the short-term tail risk of your portfolios.
+
+### Some key data:
+Capital = $100,000
+Portfolios needed: 3
+ETFs in each portfolio: 3 - 10
+Data: last 5 years (Daily)
+Bootstrap Estimate: 4 weeks (20 trading days) VaR (5% level)
+
+Clean the environment:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+rm(list=ls())
+```
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+# install.packages("mosaic")
+library(quantmod)
+library(foreach)
+library(mosaic)
+set.seed(123)
+```
+
+#### First Portfolio: Some Large ETFs (SP500, DOW JONES, NASDAQ)
+
+The first portfolio we comstruct is the riskiest one among all three, because it's composed of all equity ETFs and no bond ETFs. The ETFs we chose to put in this portfolio are:
+
+**SPY: SPDR S&P 500 ETF Trust (State Street)**
+**IWM: iShares Russell 2000 ETF (BlackRock Financial Management)**
+**DIA: SPDR Dow Jones Industrial Average ETF Trust (State Street)**
+**SPLG: SPDR Portfolio S&P 500 ETF (State Street)**
+**QQQ: Invesco QQQ Trust (Invesco)**
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+ptflo_1 = c("SPY", "IWM", "DIA", "SPLG", "QQQ")
+ptflio_1_prices = getSymbols(ptflo_1, from = "2016-01-01")
+ptflio_1_prices
+```
+Adjust for splits and dividends:
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+SPYa = adjustOHLC(SPY)
+IWMa = adjustOHLC(IWM)
+DIAa = adjustOHLC(DIA)
+SPLGa = adjustOHLC(SPLG)
+QQQa = adjustOHLC(QQQ)
+```
+Plot the adjusted ETFs to take a look at their trends:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+plot(ClCl(SPYa))
+plot(ClCl(IWMa))
+plot(ClCl(DIAa))
+plot(ClCl(SPLGa))
+plot(ClCl(QQQa))
+```
+Combine all ETFs in a single matrix (the first row is NA because there are no days before it):
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+all_ptflo_1 = cbind(ClCl(SPYa),ClCl(IWMa),ClCl(DIAa),ClCl(SPLGa),ClCl(QQQa))
+head(all_ptflo_1)
+
+all_ptflo_1 = as.matrix(na.omit(all_ptflo_1))
+N = nrow(all_ptflo_1)
+N
+```
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+pairs(all_ptflo_1)
+```
+
+Set the weight of my holdings (assuming equal allocation in my portfolio) and loop over four trading weeks (20 days):
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+total_wealth = 100000
+weights = c(0.2, 0.2, 0.2, 0.2, 0.2)
+holdings = total_wealth * weights
+n_days = 20
+wealthtracker = rep(0, n_days) # a placeholder to track total wealth
+
+for(today in 1:n_days) {
+  return.today = resample(all_ptflo_1, 1, orig.ids=FALSE)  # sampling from R matrix in notes
+  holdings = holdings + (holdings * return.today)
+  total_wealth = sum(holdings)
+  wealthtracker[today] = total_wealth
+}
+total_wealth
+plot(wealthtracker, type='l')
+```
+
+Now do the bootstrap (balancing the stocks every day):
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+initial_wealth = 100000
+sim1 = foreach(i=1:1000, .combine='rbind') %do% {     # %do%: foreach syntax
+  total_wealth = initial_wealth
+  weights = c(0.2, 0.2, 0.2, 0.2, 0.2)
+  holdings = weights * total_wealth
+  n_days = 20
+  wealthtracker = rep(0, n_days) # placeholder for total wealth tracking
+  for(today in 1:n_days) {
+    return.today = resample(all_ptflo_1, 1, orig.ids=FALSE)
+    holdings = holdings + holdings*return.today
+    total_wealth = sum(holdings)
+    wealthtracker[today] = total_wealth
+    
+    holdings = weights * total_wealth # rebalance step
+  }
+  wealthtracker
+}
+wealthtracker
+```
+
+Take a look at our simulated values:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+head(sim1)
+```
+Take a look at the profit/loss we got for Portfolio 1:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+mean(sim1[,n_days])
+mean(sim1[,n_days] - initial_wealth)
+hist(sim1[,n_days]- initial_wealth, breaks=30)
+cat('\n','Average total value in Portfolio 1 in these 20 days is: $',mean(sim1[,n_days]), '\n')
+cat('\n','Average return of investment in Portfolio 1 after 20 days is: $', mean(sim1[,n_days] - initial_wealth), '\n')
+```
+Plot a graph that shows the daily total value of Portfolio 1:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+daily_wealth = c()
+for (i in 1:n_days){
+    daily_wealth[i] = mean(sim1[,i]) 
+}
+days = 1:n_days
+df = data.frame(daily_wealth, days)
+
+plot(df$days, df$daily_wealth, type = 'p', 
+     main = 'Total Value of Portfolio 1 (Daily)',
+     xlab = 'Days', ylab = 'Total value in Dollars ($)')
+```
+
+Calculate Value at Risk (VaR) with 5% level:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+VaR1 = quantile(sim1[,n_days]- initial_wealth, prob=0.05)
+cat('\n','5% Value at Risk for Portfolio 1 is',VaR1, '\n')
+```
+
+
+
+#### Second Portfolio: Some Select Sector Equity ETFs and Some bonds
+
+The second portfolio is a mix, we put five Select Sector ETFs along with three government bond ETFs in it. The ETFs we chose to put in this portfolio are:
+
+**XLK: Technology Select Sector SPDR Fund (State Street)**
+**XLF: Financial Select Sector SPDR Fund (State Street)**
+**XLE: Energy Select Sector SPDR Fund (State Street)**
+**XLI: Industrial Select Sector SPDR Fund (State Street)**
+**XLV: Health Care Select Sector SPDR Fund (State Street)**
+**BIL: SPDR Bloomberg Barclays 1-3 Month T-Bill ETF (State Street)**
+**SPAB: SPDR Portfolio Aggregate Bond ETF (State Street)**
+**SPSB: SPDR Portfolio Short Term Corporate Bond ETF (State Street)**
+
+Clean the environment:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+rm(list=ls())
+```
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+ptflo_2 = c("XLK", "XLF", "XLE", "XLI", "XLV", "BIL", "SPAB", "SPSB")
+ptflio_2_prices = getSymbols(ptflo_2, from = "2016-01-01")
+ptflio_2_prices
+```
+Adjust for splits and dividends:
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+XLKa = adjustOHLC(XLK)
+XLFa = adjustOHLC(XLF)
+XLEa = adjustOHLC(XLE)
+XLIa = adjustOHLC(XLI)
+XLVa = adjustOHLC(XLV)
+BILa = adjustOHLC(BIL)
+SPABa = adjustOHLC(SPAB)
+SPSBa = adjustOHLC(SPSB)
+```
+Plot the adjusted ETFs to take a look at their trends:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+# par(mfrow=c(2,2))
+plot(ClCl(XLKa))
+plot(ClCl(XLFa))
+plot(ClCl(XLEa))
+plot(ClCl(XLIa))
+plot(ClCl(XLVa))
+plot(ClCl(BILa))
+plot(ClCl(SPABa))
+plot(ClCl(SPSBa))
+```
+Combine all ETFs in a single matrix (the first row is NA because there are no days before it):
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+all_ptflo_2 = cbind(ClCl(XLKa), ClCl(XLFa),
+                    ClCl(XLEa), ClCl(XLIa),
+                    ClCl(XLVa), ClCl(BILa),
+                    ClCl(SPABa), ClCl(SPSBa))
+head(all_ptflo_2)
+
+all_ptflo_2 = as.matrix(na.omit(all_ptflo_2))
+N = nrow(all_ptflo_2)
+N
+```
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+pairs(all_ptflo_2)
+```
+
+Set the weight of my holdings (assuming equal allocation in my portfolio) and loop over four trading weeks (20 days):
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+total_wealth = 100000
+weights = c(0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2)
+holdings = total_wealth * weights
+n_days = 20
+wealthtracker = rep(0, n_days) # a placeholder to track total wealth
+
+for(today in 1:n_days) {
+  return.today = resample(all_ptflo_2, 1, orig.ids=FALSE)  # sampling from R matrix in notes
+  holdings = holdings + (holdings * return.today)
+  total_wealth = sum(holdings)
+  wealthtracker[today] = total_wealth
+}
+total_wealth
+plot(wealthtracker, type='l')
+```
+
+Now do the bootstrap (rebalancing the stocks every day:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+initial_wealth = 100000
+sim2 = foreach(i=1:5000, .combine='rbind') %do% {     # %do%: foreach syntax
+  total_wealth = initial_wealth
+  weights = c(0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.2)
+  holdings = weights * total_wealth
+  n_days = 20
+  wealthtracker = rep(0, n_days) # placeholder for total wealth tracking
+  for(today in 1:n_days) {
+    return.today = resample(all_ptflo_2, 1, orig.ids=FALSE)
+    holdings = holdings + holdings*return.today
+    total_wealth = sum(holdings)
+    wealthtracker[today] = total_wealth
+    
+    holdings = weights * total_wealth # rebalance step
+  }
+  wealthtracker
+}
+wealthtracker
+```
+
+Take a look at our simulated values:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+head(sim2)
+```
+Take a look at the profit/loss we got:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+mean(sim2[,n_days])
+mean(sim2[,n_days] - initial_wealth)
+hist(sim2[,n_days]- initial_wealth, breaks=30)
+cat('\n','Average total value in Portfolio 2 in these 20 days is: $',mean(sim2[,n_days]), '\n')
+cat('\n','Average return of investment in Portfolio 2 after 20 days is: $', mean(sim2[,n_days] - initial_wealth), '\n')
+```
+
+Plot a graph that shows the daily total value of Portfolio 2:
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+daily_wealth = c()
+for (i in 1:n_days){
+    daily_wealth[i] = mean(sim2[,i]) 
+}
+days = 1:n_days
+df = data.frame(daily_wealth, days)
+
+plot(df$days, df$daily_wealth, type = 'p', 
+     main = 'Total Value of Portfolio 2 (Daily)',
+     xlab = 'Days', ylab = 'Total value in Dollars ($)')
+```
+
+Calculate Value at Risk (VaR) with 5% level:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+VaR2 = quantile(sim2[,n_days]- initial_wealth, prob=0.05)
+cat('\n','5% Value at Risk for Portfolio 2 is',VaR2, '\n')
+```
+
+
+
+#### Third Portfolio: Bond ETFs
+
+The third and last portfolio is composed of eight bonds - it has both government and corporate bonds. The ETFs we chose to put in this portfolio are:
+
+**BIL: SPDR Bloomberg Barclays 1-3 Month T-Bill ETF (State Street)**
+**SPAB: SPDR Portfolio Aggregate Bond ETF (State Street)**
+**SPSB: SPDR Portfolio Short Term Corporate Bond ETF (State Street)**
+**IGIB: iShares 5-10 Year Investment Grade Corporate Bond ETF (Blackrock Financial Management)**
+**VCLT: Vanguard Long-Term Corporate Bond ETF (Vanguard)**
+**TLT: iShares 20+ Year Treasury Bond ETF (Blackrock Financial Management)**
+**VGLT: Vanguard Long-Term Treasury ETF (Vanguard)**
+**SGOV: iShares 0-3 Month Treasury Bond ETF (Blackrock Financial Management)**
+
+Clean environment:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+rm(list=ls())
+```
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+ptflo_3 = c("BIL", "SPAB", "SPSB", "IGIB", "VCLT", "TLT", "VGLT", "SGOV")
+ptflio_3_prices = getSymbols(ptflo_3, from = "2016-01-01")
+ptflio_3_prices
+```
+Adjust for splits and dividends:
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+BILa = adjustOHLC(BIL)
+SPABa = adjustOHLC(SPAB)
+SPSBa = adjustOHLC(SPSB)
+IGIBa = adjustOHLC(IGIB)
+VCLTa = adjustOHLC(VCLT)
+TLTa = adjustOHLC(TLT)
+VGLTa = adjustOHLC(VGLT)
+SGOVa = adjustOHLC(SGOV)
+```
+Plot the adjusted ETFs to take a look at their trends:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+# par(mfrow=c(2,2))
+plot(ClCl(BILa))
+plot(ClCl(SPABa))
+plot(ClCl(SPSBa))
+plot(ClCl(IGIBa))
+plot(ClCl(VCLTa))
+plot(ClCl(TLTa))
+plot(ClCl(VGLTa))
+plot(ClCl(SGOVa))
+```
+Combine all ETFs in a single matrix (the first row is NA because there are no days before it):
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+all_ptflo_3 = cbind(ClCl(BILa), ClCl(SPABa), 
+                    ClCl(SPSBa), ClCl(IGIBa),
+                    ClCl(VCLTa), ClCl(TLTa),
+                    ClCl(VGLTa), ClCl(SGOVa))
+head(all_ptflo_3)
+
+all_ptflo_3 = as.matrix(na.omit(all_ptflo_3))
+N = nrow(all_ptflo_3)
+N
+```
+
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+pairs(all_ptflo_3)
+```
+
+Set the weight of my holdings (assuming equal allocation in my portfolio) and loop over four trading weeks (20 days):
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+total_wealth = 100000
+weights = c(0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125)
+holdings = total_wealth * weights
+n_days = 20
+wealthtracker = rep(0, n_days) # a placeholder to track total wealth
+
+for(today in 1:n_days) {
+  return.today = resample(all_ptflo_3, 1, orig.ids=FALSE)  # sampling from R matrix in notes
+  holdings = holdings + (holdings * return.today)
+  total_wealth = sum(holdings)
+  wealthtracker[today] = total_wealth
+}
+total_wealth
+plot(wealthtracker, type='l')
+```
+
+Now do the bootstrap (rebalancing the stocks every day):
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+initial_wealth = 100000
+sim3 = foreach(i=1:5000, .combine='rbind') %do% {     # %do%: foreach syntax
+  total_wealth = initial_wealth
+  weights = c(0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125, 0.125)
+  holdings = weights * total_wealth
+  n_days = 20
+  wealthtracker = rep(0, n_days) # placeholder for total wealth tracking
+  for(today in 1:n_days) {
+    return.today = resample(all_ptflo_3, 1, orig.ids=FALSE)
+    holdings = holdings + holdings*return.today
+    total_wealth = sum(holdings)
+    wealthtracker[today] = total_wealth
+    
+    holdings = weights * total_wealth # rebalance step
+  }
+  wealthtracker
+}
+wealthtracker
+```
+
+Take a look at our simulated values:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+head(sim3)
+```
+Take a look at the profit/loss we got:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+mean(sim3[,n_days])
+mean(sim3[,n_days] - initial_wealth)
+hist(sim3[,n_days]- initial_wealth, breaks=30)
+cat('\n','Average total value in Portfolio 3 in these 20 days is: $',mean(sim3[,n_days]), '\n')
+cat('\n','Average return of investment in Portfolio 3 after 20 days is: $', mean(sim3[,n_days] - initial_wealth), '\n')
+```
+
+Plot a graph that shows the daily total value of Portfolio 3:
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+daily_wealth = c()
+for (i in 1:n_days){
+    daily_wealth[i] = mean(sim3[,i]) 
+}
+days = 1:n_days
+df = data.frame(daily_wealth, days)
+
+plot(df$days, df$daily_wealth, type = 'p', 
+     main = 'Total Value of Portfolio 3 (Daily)',
+     xlab = 'Days', ylab = 'Total value in Dollars ($)')
+```
+
+Calculate Value at Risk (VaR) with 5% level:
+```{r, echo = FALSE, message=FALSE, warning=FALSE}
+VaR3 = quantile(sim3[,n_days]- initial_wealth, prob=0.05)
+cat('\n','5% Value at Risk for Portfolio 3 is',VaR3, '\n')
+```
+
+### **Summary: **
+
+*Data we got from above portfolio modeling process:*
+
+ Average total value in Portfolio 1 in these 20 days is: $ 102447.3 
+ Average return of investment in Portfolio 1 after 20 days is: $ 2447.263 
+ 5% Value at Risk for Portfolio 1 is -7713.79
+
+ Average total value in Portfolio 2 in these 20 days is: $ 100838.9 
+ Average return of investment in Portfolio 2 after 20 days is: $ 838.9329
+ 5% Value at Risk for Portfolio 2 is -4706.715 
+
+ Average total value in Portfolio 3 in these 20 days is: $ 100056.5 
+ Average return of investment in Portfolio 3 after 20 days is: $ 56.53248 
+ 5% Value at Risk for Portfolio 3 is -2225.446 
+ 
+ 
+From our analysis, we can see that the highest average return in 20 days is in Portfolio 1, but it also have the biggest VaR amount, meaning that it's the riskiest portfolio. The lowest average return is in Portfolio 3, which also has the smallest VaR amount. And Portfolio 2 is just right in the middle, for both risk and return. This modeling result we  proved "High Risk High Return" in investment.
+
+
+
+
+# 4. Market Segmentation
+
+### In this exercise, we will analyze a dataset which contains social marketing data and identify some interesting market segments that appear to stand out in their social-media audience.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+rm(list=ls())
+library(ggplot2)
+#install.packages("LICORS")
+#install.packages("spam")
+#install.packages("spam", repos="http://cran.rstudio.com/", dependencies=TRUE)
+library(LICORS)
+library(foreach)
+library(mosaic)
+library(factoextra)
+library(corrplot)
+```
+
+### Data Cleaning
+
+It is mentioned in the description of exercise 4 that spam and adult posts may be created by bots, so we removed these 2 categories during our analysis. We also removed the chatter and uncategorized category because those are used by annotators when they cannot successfully identify the category of a post. Finally, the category "photo sharing" is too vague to identify what types of pictures the user is sharing. Therefore, we also removed it from our data set.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# read the data set
+data <- read.csv("social_marketing.csv", row.names=1)
+# Remove the following rows: chatter, uncategorized, spam, adult
+data[, c("chatter","uncategorized","spam", "adult", 'photo_sharing')]<-list(NULL)
+```
+
+### Correlation Check 
+
+The correlation matrix shows that there is some correlation between travel and politics, college uni and online gaming, beauty and cooking, and personal fitness and health nutrition. However, the correlation matrix can not help us investigate the breakdown of categories within clusters.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Check the correlation between each category
+# png(file="correlation.png", res=300, width=4500, height=4500)
+corrplot(cor(data), method='color', tl.cex = 1)
+# dev.off()
+```
+
+### K-means Cluster
+
+To find out what categories are more suitable to group together, we will use the K-means cluster method to perform our analysis. Using the elbow method, we decide to employ the K-means with the K value as 6. We figured that it is the point where the plot starts to flatten.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Center and scale the data
+data_scaled <- scale(data, center=TRUE, scale=TRUE)
+# Extract the centers and scales from the rescaled data 
+mu = attr(data_scaled,"scaled:center")
+sigma = attr(data_scaled,"scaled:scale")
+# Use elbow method to find the optimal k
+set.seed(1)
+fviz_nbclust(data_scaled, kmeans, method = "wss")
+```
+
+The graph below shows how the our users are clustered into 6 groups.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Run k-means with 6 clusters and 25 starts
+clust1 = kmeans(data_scaled, 6, nstart=25)
+fviz_cluster(clust1, geom = "point", data_scaled)
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Map the cluster number to each row
+out <- cbind(data, clusterNum = clust1$cluster)
+```
+
+### Breakdown of Groups
+
+We calculated the number of posts in each category in each cluster. Our first group of users post more on travel, politics, and news. They may be interested in learning/exploring what's happening in their every day life and exploring places that are new or interesting to them.    
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Plot distribution of categories in cluster 1
+cluster1 <- subset(out, clusterNum==1)
+barplot(colSums(cluster1[,1:31]), las=2, cex.names=.7)
+```
+
+Our second group of users seem to be more interested in cooking, beauty, and fashion. The audience of this group may in general be more artistic.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Plot distribution of categories in cluster 2
+cluster2 <- subset(out, clusterNum==2)
+barplot(colSums(cluster2[,1:31]), las=2, cex.names=.7)
+```
+
+The third group post more about sports fandom, religion, food, parenting. Categories about family and school also are popular in this group. We think this group values their family and related activities.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Plot distribution of categories in cluster 3
+cluster3 <- subset(out, clusterNum==3)
+barplot(colSums(cluster3[,1:31]), las=2, cex.names=.7)
+```
+
+The fourth group posts more about health nutrition and personal fitness. The audience here clearly care more about staying healthy.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Plot distribution of categories in cluster 4
+cluster4 <- subset(out, clusterNum==4)
+barplot(colSums(cluster4[,1:31]), las=2, cex.names=.7)
+```
+
+The fifth group of users clearly post more about online gaming and college/university. We assume that people in this group are mostly students.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Plot distribution of categories in cluster 5
+cluster5 <- subset(out, clusterNum==5)
+barplot(colSums(cluster5[,1:31]), las=2, cex.names=.7)
+```
+
+Finally, our sixth group seems to prefer posting about shopping and current events, but the total amount of posts do not differ from other posts too much. We think this group of people has a wide range of interests and would be better to not treat them as one single group. 
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Plot distribution of categories in cluster 6
+cluster6 <- subset(out, clusterNum==6)
+barplot(colSums(cluster6[,1:31]), las=2, cex.names=.7)
+```
+
+### **Conclusion: **
+
+Using the K-means cluster method and further investigating the categories of posts in each group, we identified 5 groups of people:
+
+1. The Explorers: post more about travel, politics, and news.
+2. The Artists: post more about beauty, fashion, and cooking.
+3. The Family: post more about sports fandom, religion, food, parenting.
+4. The Health-conscious: post more about health nutrition and personal fitness.
+5. The Students: post more about online gaming and college/university.
+
+
+
+
+# 5. Author Attribution
+
+### In this problem, we will build a predictive model to predict the authors of the articles for 50 articles. The best model we selected to solve text-related problems is the Naive Bayes model. 
+
+We first trained the model using the training set, and then predicted the authorship of the articles in the testing set.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+rm(list=ls())
+library(tm)
+library(magrittr)
+library(slam)
+library(proxy)
+library('e1071')
+library(caret)
+library(plyr)
+library(dplyr)
+library(ggplot2)
+set.seed(123)
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+#Setting the working directory
+#author_train = Sys.glob('/Users/ambikhamaharaj/Desktop/STA380-master 2/data/ReutersC50/C50train/*')
+author_train = Sys.glob('~/Desktop/MSBA/Summer 2021/STA 380 - Intro to ML/Exercise/C50train/*')
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+#Function to read the files itself
+readerPlain = function(fname){
+				readPlain(elem=list(content=readLines(fname)), 
+							id=fname, language='en') }
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+#Create the training set and read all the files
+file_list = NULL
+train_data= NULL
+for(name in author_train) {
+  author_name = substring(name, first=50)
+  add = Sys.glob(paste0(name, '/*.txt'))
+  file_list = append(file_list, add)
+  train_data = append(train_data, rep(author_name, length(add)))
+}
+
+docs= lapply(file_list, readerPlain)
+
+mynames = file_list %>%
+{ strsplit(., '/', fixed=TRUE) } %>%
+{ lapply(., tail, n=2) } %>%
+{ lapply(., paste0, collapse = '') } %>%
+  unlist
+
+mynames
+names(docs)=mynames
+
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+#Creating text mining corpus with 
+train_data_corp= Corpus(VectorSource(docs))
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+#Below are the pre-processing/tokenization steps using the tm_map function.
+my_documents = train_data_corp %>%
+# This is to make everything lowercase
+  tm_map(content_transformer(tolower))  %>%           
+# This is to remove numbers
+  tm_map(content_transformer(removeNumbers)) %>%        
+#This is to remove punctuation
+  tm_map(content_transformer(removePunctuation)) %>%    
+# This is to remove excess white-space
+  tm_map(content_transformer(stripWhitespace)) 
+
+#Removing basic English stop words
+my_documents = tm_map(my_documents, content_transformer(removeWords), stopwords("en"))
+
+##
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+#Create the document term matrix
+DTM_train = DocumentTermMatrix(my_documents)
+DTM_train
+
+#Remove the sparse terms and keep the terms which appear in 95% or more documents 
+DTM_train = removeSparseTerms(DTM_train, 0.95)
+DTM_train
+
+DTM_train = as.matrix(DTM_train)
+DTM_train = as.data.frame(DTM_train)
+# now ~ 1000 terms (versus ~3000 before)
+```
+
+Using the DMT train matrix, we can see that as compared to before, there are 32670 terms in the 2500 documents, but after removing the sparse terms, the number of terms decreases to 885. These are the number of terms that appear in 95% or more of the documents. 
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+##TEST DATASET
+#Repeat the same steps for the matrix for the test dataset
+author_test = Sys.glob('~/Desktop/MSBA/Summer 2021/STA 380 - Intro to ML/Exercise/C50test/*')
+
+file_list = NULL
+test_data= NULL
+author_names = NULL
+for(name in author_train) {
+  author_name = substring(name, first=50)
+  author_names = append(author_names, author_name)
+  add = Sys.glob(paste0(name, '/*.txt'))
+  file_list = append(file_list, add)
+  test_data = append(test_data, rep(author_name, length(add)))
+}
+
+docs= lapply(file_list, readerPlain)
+
+file_list = as.character(file_list)
+
+mynames = file_list %>%
+{ strsplit(., '/', fixed=TRUE) } %>%
+{ lapply(., tail, n=2) } %>%
+{ lapply(., paste0, collapse = '') } %>%
+  unlist
+mynames
+names(docs)=mynames
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+#Test corpus
+#Creating text mining corpus with 
+test_data_corp= Corpus(VectorSource(docs))
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+#Below are the pre-processing/tokenization steps using the tm_map function.
+my_documents = test_data_corp %>%
+# This is to make everything lowercase
+  tm_map(content_transformer(tolower))  %>%           
+# This is to remove numbers
+  tm_map(content_transformer(removeNumbers)) %>%        
+#This is to remove punctuation
+  tm_map(content_transformer(removePunctuation)) %>%    
+# This is to remove excess white-space
+  tm_map(content_transformer(stripWhitespace)) 
+
+#Create the document term matrix
+DTM_test = DocumentTermMatrix(my_documents)
+DTM_test
+
+#Remove the sparse terms and keep the terms which appear in 95% or more documents 
+DTM_test = removeSparseTerms(DTM_test, 0.95)
+DTM_test
+
+#Removing basic English stop words
+my_documents = tm_map(my_documents, content_transformer(removeWords), stopwords("en"))
+DTM_test
+
+DTM_test = as.matrix(DTM_test)
+DTM_test = as.data.frame(DTM_test)
+
+```
+
+Using the DMT test matrix, after removing the sparse terms, the number of terms decreases to 802 in the 2500 documents. These are the number of terms that appear in 95% or more of the documents. 
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+#Building the model for Naive Bayes and can be used to compare the predictions made from the model to the authors
+DTM_train<-cbind(DTM_train,train_data)
+DTM_test<-cbind(DTM_test,test_data)
+bayes = naiveBayes(as.factor(train_data)~., data=DTM_train)
+bayes_level = predict(bayes, DTM_test[,-ncol(DTM_test)], type="class")
+
+# Comparing the predictions from the model and the authors
+
+library(caret)
+bayes_table <-data.frame(table(DTM_test$test_data, bayes_level))
+sum(DTM_test$test_data == bayes_level)
+
+```
+
+Based on the sum there are 1651 observations whose authors matched out of the 2500 combinations from the various documents and authors combinations. 
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+#Using a confusion matrix to predict the accuracy of how well Naive Bayes performs as a model
+confusionMatrix(DTM_test$test_data, bayes_level)$overall['Accuracy']
+```
+
+## **SUMMARY**
+
+On finding the accuracy, we found that the Naive Bayes model has an accuracy level of about 66%. Naive Bayes proves to be the best model for text classifications as it classifies based on probabilities of the events using catergorical variables as opposed to numerical variables. 
+
+
+
+
+# 6. Association Rule Mining
+
+### In this problem, we are going to analyze some data on grocery purchasing and find some interesting association rules for these shopping baskets.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+rm(list=ls())
+library(tidyverse)
+#install.packages('arules')
+library(arules)  # has a big ecosystem of packages built around it
+#install.packages('arulesViz')
+library(arulesViz)
+set.seed(123)
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# read the grocery txt file and preprocess it into readable file
+grocery = read.delim("groceries.txt", sep = "\n",header = FALSE)
+# Adding index column to separate items in each basket
+grocery = tibble::rowid_to_column(grocery, "index")
+# Rename the colunm 2
+colnames(grocery)[2] = c('Baskets')
+head(grocery)
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+str(grocery)
+summary(grocery)
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# convert index column into factor
+grocery$index = factor(grocery$index)
+grocery$Baskets = as.character(grocery$Baskets)
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# We first transform the dataset in to transaction class.
+grocery1 = strsplit(grocery$Baskets, ",")
+groceries1 = as(grocery1, "transactions")
+summary(groceries1)
+```
+
+* According to the summary output of the dataset, there are total 9835 transactions and whole milk is the most frequent items among list of baskets. Moreover, there are  169 different items, which are represented as number of columns.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+itemFrequencyPlot(groceries1, topN = 20)
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Now we are going to run the 'apriori' algorithm
+# Look at rules with support = 0.045 & confidence = 0.01 & length (# grocery items) <= 5
+grocery1 = apriori(groceries1, 
+	parameter=list(support=.045, confidence=.01,minlen=2,maxlen=5))
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Take a look at assoication
+inspect(grocery1)
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+plot(grocery1, method='graph')
+```
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Now we will decrease support to 0.035 and keep confidence the same
+grocery2 = apriori(groceries1, 
+	parameter=list(support=.035, confidence=.01,minlen=2,maxlen=5))
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+inspect(grocery2)
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+plot(grocery2, method='graph')
+```
+
+* We find out decrease support will increase number of association rules while keeping confidence constant.
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+# Now we will keep support the same and increase confidence to 0.25
+grocery3 = apriori(groceries1, 
+	parameter=list(support=.025, confidence=.25,minlen=2,maxlen=5))
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+inspect(grocery3)
+```
+
+```{r, echo = FALSE,warning=FALSE,include=FALSE}
+plot(grocery3, method='graph')
+```
+* Keeping support constant, increase confidence will decrease number of association rules.
+
+### **Summary**
+
+There are several conclusions that can be drawn from those plots with varying number of support and confidence:
+
+1. People are more likely to buy whole milks when they bought buns and rolls.
+2. People are more likely to buy other vegetables when they bought root vegetables.
+3. People mostly bought whole milk in their shopping baskets.
+
